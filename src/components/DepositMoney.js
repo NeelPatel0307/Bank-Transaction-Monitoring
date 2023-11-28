@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 
 import { useParams } from 'react-router-dom';
-import './DepositMoney.css'; // Import your CSS file
+import './DepositMoney.css'; 
 const DepositMoney = () => {
     const [depositAmount, setDepositAmount] = useState('');
     const [withdrawalAmount, setWithdrawalAmount] = useState('');

@@ -13,7 +13,7 @@ const Createaccount = () => {
 
   const createAccount = async () => {
     try {
-      const response = await fetch('https://785jz7c2kg.execute-api.us-east-1.amazonaws.com/dev/createaccount', {
+      const response = await fetch(`${process.env.REACT_APP_API}/createaccount`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

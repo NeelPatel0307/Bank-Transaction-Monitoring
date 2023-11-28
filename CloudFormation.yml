@@ -1,0 +1,349 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Bank transaction anaylsis Application"
+
+Resources:
+  BankAccountsTable:
+    Type: "AWS::DynamoDB::Table"
+    Properties:
+      TableName: "BankAccountsyaml"
+      AttributeDefinitions:
+        - AttributeName: "userId"
+          AttributeType: "S" 
+      KeySchema:
+        - AttributeName: "userId"
+          KeyType: "HASH" 
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+
+
+  BankingTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: Banking Topic
+      TopicName: BankingTopic 
+
+  EmailSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: email
+      TopicArn: !Ref BankingTopic
+      Endpoint: pneel0301@gmail.com
+
+  BankingQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: BankingQueue 
+
+  LambdaFunctionSendEmail:
+   Type: AWS::Lambda::Function
+   Properties:
+      FunctionName: SendEmailyml
+      Handler: index.lambda_handler
+      Runtime: nodejs16.x
+      Timeout: 60
+      Role: arn:aws:iam::724638087641:role/LabRole
+      Environment:
+       Variables:
+         SNS_TOPIC_ARN: !Ref BankingTopic
+      Code:
+          ZipFile: |
+            const AWS = require("aws-sdk");
+            const sns = new AWS.SNS();
+
+            exports.handler = async (event, context) => {
+                try {
+                    // Parse the message content from the SQS event
+                    const messageBody = JSON.parse(event.Records[0].body);
+
+                    // SNS publish parameters
+                    const snsParams = {
+                        Message: JSON.stringify(messageBody), // Pass the message content directly
+                        Subject: 'Account Creation Notification',
+                        TopicArn: process.env.SNS_TOPIC_ARN
+                    };
+
+                    // Publish message to SNS topic
+                    await sns.publish(snsParams).promise();
+
+                    // Log success
+                    console.log('Message sent successfully:', messageBody);
+
+                    // Return success response
+                    return {
+                        statusCode: 200,
+                        body: JSON.stringify({ message: 'Message sent successfully.' })
+                   };
+                } catch (error) {
+                    console.error('Error sending message:', error);
+
+                    // Return error response
+                    return {
+                        statusCode: 500,
+                        body: JSON.stringify({ error: 'Internal Server Error' })
+                   };
+               }
+            }
+
+
+  CreateBankAccountLambda:
+      Type: AWS::Lambda::Function
+      Properties:
+        FunctionName: CreateBankAccountyml
+        Handler: index.handler
+        Runtime: nodejs16.x 
+        Timeout: 60
+        Role: arn:aws:iam::724638087641:role/LabRole
+        Environment:
+          Variables:        
+            SQS_QUEUE_URL: !GetAtt BankingQueue.QueueUrl
+        Code:    
+            ZipFile: |
+             const AWS = require("aws-sdk");
+             const dynamo = new AWS.DynamoDB.DocumentClient();
+
+             exports.handler = async (event, context) => {
+                try {
+                    // Parse input data from the Lambda event
+                    const { username, email, password } = JSON.parse(event.body);
+
+                    // Generate random 6-digit userId and accountId
+                    const userId = generateRandomId(6);
+                    const accountId = generateRandomId(6);
+
+                    // DynamoDB PutItem parameters
+                    const params = {
+                        TableName: 'BankAccountsyaml',
+                        Item: {
+                            userId,
+                            accountId,
+                            username,
+                            email,
+                            password, // Store the plain text password
+                            balance: 0,
+                        },
+                        ConditionExpression: 'attribute_not_exists(accountId)' // Ensure the accountId is unique
+                   };
+
+                    // Put item into DynamoDB table
+                    await dynamo.put(params).promise();
+
+                    // After DynamoDB putItem, send a message to SQS
+                    const sqs = new AWS.SQS();
+                    const customMessage = `${username} has created an account. User ID: ${userId}, Account ID: ${accountId}`;
+                    const sqsParams = {
+                        MessageBody: JSON.stringify({ customMessage }),
+                        QueueUrl: process.env.SQS_QUEUE_URL
+                    };
+
+                    await sqs.sendMessage(sqsParams).promise();
+
+                    // Return success response
+                    return {
+                        statusCode: 200,
+                        headers: {
+                            'Access-Control-Allow-Origin': '*', // Allow requests from any origin, adjust as needed
+                            'Access-Control-Allow-Credentials': true,
+                        },
+                        body: JSON.stringify({ message: 'Account created successfully.', userId, accountId })
+                    };
+                } catch (error) {
+                    console.error('Error creating account:', error);
+
+                    // Return error response
+                    return {
+                        statusCode: 500,
+                        headers: {
+                            'Access-Control-Allow-Origin': '*', // Allow requests from any origin, adjust as needed
+                            'Access-Control-Allow-Credentials': true,
+                        },
+                        body: JSON.stringify({ error: `Internal Server Error: ${error.message}` })
+                    };
+                }
+             }
+
+             // Function to generate a random ID of the specified length
+             function generateRandomId(length) {
+                 const characters = '0123456789';
+                let result = '';
+                 for (let i = 0; i < length; i++) {
+                     const randomIndex = Math.floor(Math.random() * characters.length);
+                     result += characters.charAt(randomIndex);
+                 }
+                 return result;
+             }
+
+
+  ApiGateWayRestApi:
+    Type: "AWS::ApiGateway::RestApi"
+    Properties:
+      Name: "BankingApi"
+      Description: "API for Banking Application"
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+
+  ApiGatewayResource:
+    Type: "AWS::ApiGateway::Resource"
+    Properties:
+      RestApiId: !Ref ApiGateWayRestApi
+      ParentId: !GetAtt ApiGateWayRestApi.RootResourceId
+      PathPart: "bank"
+
+  GivingApiGateWayPermissionToAccessCreateBankAccountLambda:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      FunctionName: !GetAtt CreateBankAccountLambda.Arn
+      Action: "lambda:InvokeFunction"
+      Principal: "apigateway.amazonaws.com"
+
+
+  ApiMethodOptions:
+    Type: "AWS::ApiGateway::Method"
+    Properties:
+      RestApiId: !Ref ApiGateWayRestApi
+      ResourceId: !Ref ApiGatewayResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        IntegrationResponses:
+          - StatusCode: "200"
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Credentials: "'true'"
+            ResponseTemplates:
+              application/json: ""
+
+        PassthroughBehavior: "WHEN_NO_MATCH"
+        RequestTemplates:
+          application/json: "{\"statusCode\": 200}"
+        Type: MOCK
+      MethodResponses:
+        - StatusCode: "200"
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Credentials: true
+
+  ApiMethodPost:
+    Type: "AWS::ApiGateway::Method"
+    Properties:
+      RestApiId: !Ref ApiGateWayRestApi
+      ResourceId: !Ref ApiGatewayResource
+      AuthorizationType: NONE
+      HttpMethod: POST
+      Integration:
+        Type: "AWS"
+        IntegrationHttpMethod: POST
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CreateBankAccountLambda.Arn}/invocations"
+        IntegrationResponses:
+          - StatusCode: "200"
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Anz-Date,Authorization,X-Api-Key'"
+              method.response.header.Access-Control-Allow-Methods: "'GET, POST, PUT, DELETE'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+              method.response.header.Access-Control-Allow-Credentials: "'true'"
+            ResponseTemplates:
+              application/json: ""
+
+        PassthroughBehavior: "WHEN_NO_MATCH"
+        RequestTemplates:
+          application/json: Empty
+
+      MethodResponses:
+        - StatusCode: "200"
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+            method.response.header.Access-Control-Allow-Credentials: true
+
+  ApiGateWayDeployment:
+    Type: "AWS::ApiGateway::Deployment"
+    DependsOn : ApiMethodPost
+    Properties:
+      RestApiId: !Ref ApiGateWayRestApi
+
+  ApiStage:
+    Type: "AWS::ApiGateway::Stage"
+    DependsOn : ApiGateWayDeployment
+    Properties:
+      RestApiId: !Ref ApiGateWayRestApi
+      DeploymentId: !Ref ApiGateWayDeployment
+      StageName: prod 
+      Description: Production Stage
+
+  SecurityGroupWeb:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: Allow HTTP traffic
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
+  SecurityGroupSSH:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: Allow SSH traffic
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22 
+          CidrIp: 0.0.0.0/0
+
+  SecurityGroupCustom:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: Allow custom port traffic
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          CidrIp: 0.0.0.0/0
+     
+
+  EC2Instance:
+     Type: "AWS::EC2::Instance"
+     Properties:
+       ImageId: ami-0230bd60aa48260c6
+       InstanceType: t2.micro  
+       KeyName: my-new-keypair
+       SecurityGroupIds:
+         - !Ref SecurityGroupWeb
+         - !Ref SecurityGroupSSH
+         - !Ref SecurityGroupCustom
+
+
+       Tags: 
+         - Key: Name
+           Value: CloudComputingTermAssignment
+
+       UserData:
+         Fn::Base64: !Sub |
+           #!/bin/bash
+           sudo su
+           yum install git -y
+           git clone https://github.com/NeelPatel0307/cloudassign2.git
+           cd cloudassign2/
+           rm .env
+           echo "REACT_APP_API=\"https://${ApiGateWayRestApi}.execute-api.${AWS::Region}.amazonaws.com/prod/bank\"" > .env
+           yum install nodejs -y
+           yum install npm -y
+           npm install
+           npm run start&  
+
+Outputs:
+  WebUri:
+    Description: Server is running on this url
+    Value: !Join
+      - ""
+      - - "http://"
+        - !GetAtt
+          - EC2Instance
+          - PublicDnsName
+        - ":3000"
