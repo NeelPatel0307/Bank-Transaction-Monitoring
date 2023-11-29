@@ -13,7 +13,7 @@ const Createaccount = () => {
 
   const createAccount = async () => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_API}/createaccount`, {
+      const response = await fetch(`${process.env.REACT_APP_API}/bank`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
