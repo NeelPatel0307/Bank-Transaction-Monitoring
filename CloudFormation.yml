@@ -142,7 +142,7 @@ Resources:
                     return {
                         statusCode: 200,
                         headers: {
-                            'Access-Control-Allow-Origin': '*', // Allow requests from any origin, adjust as needed
+                            'Access-Control-Allow-Origin': event.headers.origin || '*', // Allow requests from any origin, adjust as needed
                             'Access-Control-Allow-Credentials': true,
                         },
                         body: JSON.stringify({ message: 'Account created successfully.', userId, accountId })
@@ -154,7 +154,7 @@ Resources:
                     return {
                         statusCode: 500,
                         headers: {
-                            'Access-Control-Allow-Origin': '*', // Allow requests from any origin, adjust as needed
+                            'Access-Control-Allow-Origin': event.headers.origin || '*', // Allow requests from any origin, adjust as needed
                             'Access-Control-Allow-Credentials': true,
                         },
                         body: JSON.stringify({ error: `Internal Server Error: ${error.message}` })
@@ -183,7 +183,7 @@ Resources:
         Types:
           - REGIONAL
 
-  ApiGatewayResource:
+  ApiGateWayResource:
     Type: "AWS::ApiGateway::Resource"
     Properties:
       RestApiId: !Ref ApiGateWayRestApi
@@ -197,28 +197,26 @@ Resources:
       Action: "lambda:InvokeFunction"
       Principal: "apigateway.amazonaws.com"
 
-
   ApiMethodOptions:
-    Type: "AWS::ApiGateway::Method"
+    Type: AWS::ApiGateway::Method
     Properties:
       RestApiId: !Ref ApiGateWayRestApi
-      ResourceId: !Ref ApiGatewayResource
+      ResourceId: !Ref ApiGateWayResource
       HttpMethod: OPTIONS
       AuthorizationType: NONE
       Integration:
         IntegrationResponses:
           - StatusCode: "200"
             ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE'"
               method.response.header.Access-Control-Allow-Origin: "'*'"
               method.response.header.Access-Control-Allow-Credentials: "'true'"
             ResponseTemplates:
-              application/json: ""
-
-        PassthroughBehavior: "WHEN_NO_MATCH"
+              "application/json": ""
+        PassthroughBehavior: WHEN_NO_MATCH
         RequestTemplates:
-          application/json: "{\"statusCode\": 200}"
+          "application/json": '{"statusCode": 200}'
         Type: MOCK
       MethodResponses:
         - StatusCode: "200"
@@ -228,38 +226,35 @@ Resources:
             method.response.header.Access-Control-Allow-Origin: true
             method.response.header.Access-Control-Allow-Credentials: true
 
+
   ApiMethodPost:
-    Type: "AWS::ApiGateway::Method"
+    Type: AWS::ApiGateway::Method
     Properties:
       RestApiId: !Ref ApiGateWayRestApi
-      ResourceId: !Ref ApiGatewayResource
-      AuthorizationType: NONE
+      ResourceId: !Ref ApiGateWayResource
       HttpMethod: POST
+      AuthorizationType: NONE
       Integration:
         Type: "AWS"
         IntegrationHttpMethod: POST
         Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${CreateBankAccountLambda.Arn}/invocations"
+        PassthroughBehavior: WHEN_NO_MATCH
         IntegrationResponses:
           - StatusCode: "200"
             ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Anz-Date,Authorization,X-Api-Key'"
-              method.response.header.Access-Control-Allow-Methods: "'GET, POST, PUT, DELETE'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,POST,PUT,DELETE,OPTIONS'"
               method.response.header.Access-Control-Allow-Origin: "'*'"
               method.response.header.Access-Control-Allow-Credentials: "'true'"
-            ResponseTemplates:
-              application/json: ""
-
-        PassthroughBehavior: "WHEN_NO_MATCH"
-        RequestTemplates:
-          application/json: Empty
-
       MethodResponses:
-        - StatusCode: "200"
+        - ResponseModels:
+            application/json: Empty
           ResponseParameters:
             method.response.header.Access-Control-Allow-Headers: true
             method.response.header.Access-Control-Allow-Methods: true
             method.response.header.Access-Control-Allow-Origin: true
             method.response.header.Access-Control-Allow-Credentials: true
+          StatusCode: "200"
 
   ApiGateWayDeployment:
     Type: "AWS::ApiGateway::Deployment"
