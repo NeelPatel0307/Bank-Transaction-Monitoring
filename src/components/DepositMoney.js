@@ -22,9 +22,12 @@ const DepositMoney = () => {
       });
 
       const data = await response.json();
-      console.log(data);
-      console.log(data.newBalance);
-      setDepositMessage(data.message || 'Deposit successful. New balance: ' + data.newBalance);
+
+      const bodyData = JSON.parse(data.body);
+
+      console.log(bodyData.newBalance);
+
+      setDepositMessage(bodyData.message || 'Deposit successful. New balance: ' + bodyData.newBalance);
     } catch (error) {
       console.error('Error depositing money:', error);
       setDepositMessage('Internal Server Error');
@@ -92,7 +95,7 @@ const DepositMoney = () => {
         <p className="message">{depositMessage}</p>
       </div>
 
-      <div className="transaction-section">
+      {/* <div className="transaction-section">
         <h2>Withdraw Money</h2>
         <form className="form" onSubmit={handleWithdrawalSubmit}>
           <label className="label">
@@ -102,13 +105,13 @@ const DepositMoney = () => {
           <button type="submit" className="button">Withdraw</button>
         </form>
         <p className="message">{withdrawalMessage}</p>
-      </div>
-
+      </div> */}
+{/* 
       <div className="balance-section">
         <h2>Balance</h2>
         <p className="balance">{balance !== null ? `Current Balance: $${balance.toFixed(2)}` : 'Loading...'}</p>
         <button onClick={handleRefreshBalance} className="button refresh-button">Refresh Balance</button>
-      </div>
+      </div> */}
     </div>
   );
 };
