@@ -11,21 +11,21 @@ const DepositMoney = () => {
     const [balance, setBalance] = useState(null);
     const { userId } = useParams();
 
-  const handleDeposit = async () => {
+   const handleDeposit = async () => {
     try {
       const response = await fetch(`${process.env.REACT_APP_API}/deposit/${userId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ userId, depositAmount: parseFloat(depositAmount) }),
+        body: JSON.stringify({ userId, balance: parseFloat(balance) }),
       });
 
-    const data = await response.json();
-  console.log(data);
-    console.log(data.newBalance);
+      const data = await response.json();
+      console.log(data);
+        console.log(data.newBalance);
 
-    setDepositMessage(data.message || 'Deposit successful. New balance: ' + data.newBalance);
+      setDepositMessage(data.message || 'Deposit successful. New balance: ' + data.newBalance);
     } catch (error) {
       console.error('Error depositing money:', error);
       setDepositMessage('Internal Server Error');
