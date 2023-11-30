@@ -40,6 +40,7 @@ const Createaccount = () => {
       });
 
       const data = await response.json();
+      console.log(data);
       console.log(data.userId);
       if(data.message){
 navigate(`/operation/${data.userId}`);
