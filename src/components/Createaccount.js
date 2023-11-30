@@ -45,10 +45,12 @@ const Createaccount = () => {
       const bodyData = JSON.parse(data.body);
 
       console.log(bodyData.userId);
-      if(data.message){
-navigate(`/operation/${data.userId}`);
+
+    
+      if(bodyData.message){
+navigate(`/operation/${bodyData.userId}`);
       }
-      setSignInMessage(data.message || 'Sign in successful.'); // Handle the response from the Lambda function
+      setSignInMessage(bodyData.message || 'Sign in successful.'); // Handle the response from the Lambda function
     } catch (error) {
       console.error('Error signing in:', error);
       setSignInMessage('Invalid credentials');
