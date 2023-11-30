@@ -11,14 +11,14 @@ const DepositMoney = () => {
     const [balance, setBalance] = useState(null);
     const { userId } = useParams();
 
-   const handleDeposit = async () => {
+ const handleDeposit = async () => {
     try {
       const response = await fetch(`${process.env.REACT_APP_API}/deposit/${userId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ userId, balance: parseFloat(balance) }),
+        body: JSON.stringify({ balance: parseFloat(depositAmount) }),
       });
 
       const data = await response.json();
