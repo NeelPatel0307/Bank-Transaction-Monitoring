@@ -22,7 +22,7 @@ const DepositMoney = () => {
       });
 
     const data = await response.json();
-
+  console.log(data);
     console.log(data.newBalance);
 
     setDepositMessage(data.message || 'Deposit successful. New balance: ' + data.newBalance);
