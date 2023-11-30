@@ -21,13 +21,11 @@ const DepositMoney = () => {
         body: JSON.stringify({ userId, depositAmount: parseFloat(depositAmount) }),
       });
 
-      const data = await response.json();
+    const data = await response.json();
 
-      const bodyData = JSON.parse(data.body);
+    console.log(data.newBalance);
 
-      console.log(bodyData.newBalance);
-
-      setDepositMessage(bodyData.message || 'Deposit successful. New balance: ' + bodyData.newBalance);
+    setDepositMessage(data.message || 'Deposit successful. New balance: ' + data.newBalance);
     } catch (error) {
       console.error('Error depositing money:', error);
       setDepositMessage('Internal Server Error');
